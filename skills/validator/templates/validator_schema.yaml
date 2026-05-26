@@ -1,0 +1,255 @@
+# Envoy v1.38.0 Static Resource Configuration Schema
+# Canonical schema for envoy-config-validator
+
+# Root: Envoy bootstrap configuration
+type: object
+required:
+  - static_resources
+
+properties:
+  # --- Node metadata ---
+  node:
+    type: object
+    properties:
+      id:
+        type: string
+        description: "Unique node identifier (default: 'listener address') - required for multi-node setups"
+      cluster:
+        type: string
+        description: "Node cluster name - must reference a known cluster"
+      metadata:
+        type: object
+        description: "Key-value metadata attached to the node"
+      build_version:
+        type: string
+        description: "Envoy build version string"
+
+  # --- Runtime overrides ---
+  layered_runtime:
+    type: object
+    properties:
+      layers:
+        type: array
+        description: "Ordered list of runtime layers"
+
+  # --- Admin interface ---
+  admin:
+    type: object
+    properties:
+      address:
+        type: object
+        required: [socket_address]
+        properties:
+          socket_address:
+            type: object
+            properties:
+              address:
+                type: string
+              port_value:
+                type: integer
+              protocol:
+                enum: [TCP, UDS]
+
+  # --- Static Resources (core config) ---
+  static_resources:
+    type: object
+    required: [listeners, clusters]
+    properties:
+      # --- Listeners (inbound traffic entry points) ---
+      listeners:
+        type: array
+        items:
+          type: object
+          required: [name, address, filter_chains]
+          properties:
+            name:
+              type: string
+            address:
+              type: object
+              properties:
+                socket_address:
+                  type: object
+                  required: [address, port_value]
+                  properties:
+                    address:
+                      type: string
+                    port_value:
+                      type: integer
+            filter_chains:
+              type: array
+              required: [filters]
+              items:
+                type: object
+                required: [filters]
+                properties:
+                  filters:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, typed_config]
+                      properties:
+                        name:
+                          type: string
+                          description: "Full filter name (e.g., envoy.filters.network.http_connection_manager)"
+                        typed_config:
+                          type: object
+                          properties:
+                            "@type":
+                              type: string
+                            stat_prefix:
+                              type: string
+                            route_config:
+                              type: object
+                              required: [virtual_hosts]
+                              properties:
+                                virtual_hosts:
+                                  type: array
+                                  items:
+                                    type: object
+                                    required: [name, domains, routes]
+                                    properties:
+                                      name:
+                                        type: string
+                                      domains:
+                                        type: array
+                                        items:
+                                          type: string
+                                      routes:
+                                        type: array
+                                        items:
+                                          type: object
+                                          properties:
+                                            match:
+                                              type: object
+                                            route:
+                                              type: object
+                                              properties:
+                                                cluster:
+                                                  type: string
+                                                timeout:
+                                                  type: string
+                                                  description: "Route-level timeout (e.g., '5s')"
+            transport_socket:
+              type: object
+              properties:
+                name:
+                  type: string
+                typed_config:
+                  type: object
+                  properties:
+                    "@type":
+                      type: string
+                    common_tls_context:
+                      type: object
+                      properties:
+                        tls_params:
+                          type: object
+                        tls_certificates:
+                          type: array
+                          items:
+                            type: object
+                            required: [certificate_chain, private_key]
+                            properties:
+                              certificate_chain:
+                                type: object
+                                properties:
+                                  filename:
+                                    type: string
+                              private_key:
+                                type: object
+                                properties:
+                                  filename:
+                                    type: string
+
+      # --- Clusters (outbound destinations) ---
+      clusters:
+        type: array
+        items:
+          type: object
+          required: [name, connect_timeout, lb_policy, load_assignment]
+          properties:
+            name:
+              type: string
+            connect_timeout:
+              type: string
+              description: "Connection timeout (e.g., '0.25s')"
+            type:
+              enum: [STRICT_DNS, LOGICAL_DNS, ORIGINAL_DST]
+              description: "DNS resolution type for cluster"
+            lb_policy:
+              enum: [ROUND_ROBIN, LEAST_REQUEST, RANDOM, ROUND_ROBIN]
+              description: "Load balancing policy"
+            load_assignment:
+              type: object
+              required: [cluster_name, endpoints]
+              properties:
+                cluster_name:
+                  type: string
+                endpoints:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      lb_endpoints:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            endpoint:
+                              type: object
+                              properties:
+                                address:
+                                  type: object
+                                  properties:
+                                    socket_address:
+                                      type: object
+                                      properties:
+                                        address:
+                                          type: string
+                                        port_value:
+                                          type: integer
+            health_checks:
+              type: array
+              items:
+                type: object
+                required: [timeout, interval, http_health_check]
+                properties:
+                  timeout:
+                    type: string
+                  interval:
+                    type: string
+                  healthy_threshold:
+                    type: integer
+                  unhealthy_threshold:
+                    type: integer
+                  http_health_check:
+                    type: object
+                    required: [path]
+                    properties:
+                      path:
+                        type: string
+            circuit_breakers:
+              type: object
+              properties:
+                thresholds:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      priority:
+                        type: string
+                      max_connections:
+                        type: integer
+                      max_pending_requests:
+                        type: integer
+                      max_requests:
+                        type: integer
+                      max_retries:
+                        type: integer
+            transport_socket:
+              type: object
+              properties:
+                name:
+                  type: string
+                typed_config:
+                  type: object
