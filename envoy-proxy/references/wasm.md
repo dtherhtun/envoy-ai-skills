@@ -23,9 +23,11 @@ The WASM filter enables custom logic via WebAssembly plugins. Envoy supports mul
 
 | Source | Use Case | Security |
 |--------|----------|----------|
-| `local_file` | Development, minimal ops | Verify file integrity externally |
-| `remote_url` | CI/CD pipelines, centralized | SHA-256 verified download |
-| `inline_bytes` | Embedding small plugins | No network required, size-limited |
+|| `local` | Development, minimal ops | Verify file integrity externally |
+|| `remote_url` | CI/CD pipelines, centralized | SHA-256 verified download |
+|| `inline_bytes` | Embedding small plugins | No network required, size-limited |
+
+**Source fields (v3):** `local` (filename), `remote` (http_uri + sha256), `inline_bytes`.
 
 ## Complete WASM Configuration
 
@@ -76,7 +78,8 @@ The WASM filter enables custom logic via WebAssembly plugins. Envoy supports mul
       vm_id: "local_vm"
       runtime: envoy.wasm.runtime.wasmtime
       code:
-        local_file: "/etc/envoy/plugins/example.wasm"
+        local:
+          filename: "/etc/envoy/plugins/example.wasm"
 ```
 
 ### Inline WASM Plugin (Small plugins only)
@@ -236,7 +239,7 @@ configuration:
 | SHA-256 mismatch between config and actual .wasm | Plugin download rejected | Always verify SHA-256 after downloading: `sha256sum plugin.wasm` |
 | `root_id` mismatch between filter config and `vm_config` | Plugin initialization fails | `config.root_id` must exactly match the `vm_config` that references it |
 | Missing `vm_id` for shared plugins | Each filter creates a separate VM, high memory | Set `vm_id` to the same value across filter instances |
-| Using `inline_bytes` with large plugins | Envoy rejects the upload | Use `remote_url` or `local_file` for plugins > ~64KB |
+| Using `inline_bytes` with large plugins | Envoy rejects the upload | Use `remote` or `local` for plugins > ~64KB |
 | WASM on upstream cluster without `allow_precompiled` | Precompiled code may be rejected | Set `allow_precompiled: true` in `vm_config` |
 | Multiple WASM filters on same listener | Conflicting execution, hard to debug | Use single WASM filter with multiple configurations via `typed_per_filter_config` |
 | Forgetting `trigger: ALWAYS` on remote source | Plugin not re-fetched on Envoy restart | Use `trigger: ALWAYS` for remote WASM code |

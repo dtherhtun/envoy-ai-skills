@@ -69,12 +69,12 @@ static_resources:
                   path: "/etc/envoy/certs/server-key.yaml"
             combined_validation_context:
               match_typed_subject_alt_names:
-              - spiffe_id: "cluster.example.svc.cluster.local"
+              - match_option:
+                  spiffe_id: "cluster.example.svc.cluster.local"
               validation_context:
                 trusted_ca:
                   sds_config:
                     path: "/etc/envoy/certs/ca-cert.yaml"
-              match_client_cert_spiffe: true  # v1.33+
           require_client_certificate: true  # strict mTLS
       filters:
       - name: envoy.filters.network.http_connection_manager
@@ -165,8 +165,8 @@ static_resources:
 | DownstreamTlsContext | `type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext` |
 | UpstreamTlsContext | `type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext` |
 | FileAccessLog | `type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog` |
-| ZipkinConfig | `type.googleapis.com/envoy.extensions.trace_engines.zipkin.v3.ZipkinConfig` |
-| OpenTelemetryConfig | `type.googleapis.com/envoy.extensions.trace_engines.open_telemetry.v3.OpenTelemetryConfig` |
+|| ZipkinConfig | `type.googleapis.com/envoy.config.trace.v3.ZipkinConfig` |
+|| OpenTelemetryConfig | `type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig` |
 
 ## Key Config Patterns
 
@@ -254,16 +254,17 @@ curl http://127.0.0.1:9901/certs                     # TLS certificate info
 ### SDS Secret Rotation
 ```bash
 cat > /etc/envoy/certs/server-cert.yaml << 'EOF'
-static_resources:
-  secrets:
-  - name: server_cert
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
     certificate_chain:
       filename: /etc/envoy/certs/server.crt
     private_key:
       filename: /etc/envoy/certs/server.key
 EOF
 kill -USR1 $(cat /var/run/envoy.pid)
-curl http://127.0.0.1:9901/config_dump?mask=secrets | jq '.configs[].static_secrets[]?.name'
+curl http://127.0.0.1:9901/config_dump?mask=secrets | jq '.configs[].dynamic_secrets[]?.name'
 ```
 
 ## Reference Pointer

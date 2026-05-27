@@ -43,8 +43,6 @@ Complete reference for upstream cluster types, load balancing, health checks, ci
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
   dns_refresh_rate: 30s
-  dns_resolver_tlmare:
-    dns_query_timeout: 5s
   load_assignment:
     cluster_name: dns_backend
     endpoints:
@@ -156,9 +154,6 @@ health_checks:
     path: /healthz
   grpc_health_check:
     service_name: "health"
-  health_check_timeout: 5s
-  unhealthy_grace_period: 60s
-  healthy_edge_of_service_zone: true
 ```
 
 ### Passive (Outbound-Only) Health Check
@@ -171,7 +166,6 @@ health_checks:
   healthy_threshold: 2
   http_health_check:
     path: /healthz
-  http_failures_to_boundary: 3  # Failures before marking boundary unhealthy
   tcp_health_check:
     idle_timeout: 30s
 ```
@@ -199,7 +193,7 @@ health_checks:
 outlier_detection:
   consecutive_gateway_failure: 3        # Consecutive 502/503/504 to eject
   consecutive_5xx: 5                    # Consecutive 5xx to eject
-  consecutive_200_to_5xx_p вариации:    # Ratio-based (advanced)
+  consecutive_200_to_5xx:              # Ratio-based ejection
     consecutive: 3
     status_code:
       code: 503
@@ -210,29 +204,25 @@ outlier_detection:
   min_health_percent: 10                # Don't eject if remaining < 10%
   consecutive_spurious_connect_failure:  # Spurious reconnection failures
     consecutive: 5
-  splitting_weight:
-    uniform: {}  # Or weighted: {weights: [50, 30, 20]}
 ```
 
 ## Circuit Breaker
 
 ```yaml
-common_upstream_config:
-  common_http_protocol_options:
-    idle_timeout: 300s
-  initial_connection_buffer_limit: 1MiB  # Proto max buf
-circuit_breakers:
-  thresholds:
-  - priority: DEFAULT
-    max_connections: 1024
-    max_pending_requests: 1024
-    max_requests: 1024
-    max_retries: 3
-  - priority: HIGH
-    max_connections: 2048
-    max_pending_requests: 2048
-    max_requests: 2048
-    max_retries: 3
+# Circuit breaker thresholds
+common_lb_config:
+  circuit_breakers:
+    thresholds:
+    - priority: DEFAULT
+      max_connections: 1024
+      max_pending_requests: 1024
+      max_requests: 1024
+      max_retries: 3
+    - priority: HIGH
+      max_connections: 2048
+      max_pending_requests: 2048
+      max_requests: 2048
+      max_retries: 3
 ```
 
 ## Cluster-Level Transport & Protocol Options
@@ -272,7 +262,5 @@ circuit_breakers:
 | Missing `interval_jitter` | All hosts checked simultaneously (thundering herd) | Add `interval_jitter: 1s` (or similar) |
 | Static cluster without `load_assignment` | No endpoints to route to | Always include `load_assignment` with at least one endpoint |
 | EDS without `api_config_source` | No endpoint updates received | Configure `eds_config` with gRPC or REST API source |
-| `unhealthy_grace_period` too short | Host flaps between healthy/unhealthy | Set to at least `3 × health_check_interval` |
 | `initial_back_off_bound` too large for latency-sensitive | Requests timeout waiting for backup | Tune `initial_back_off: 0.1s`, `max_back_off: 1s` for latency-sensitive |
 | Circuit breaker `max_connections` lower than LB connections | New connections rejected immediately | Match `max_connections` to expected concurrent connections |
-| Missing `drain_connection_on_host_health_change` | Connections to new/old hosts persist after health change | Add `drain_connection_on_host_health_change: true` |

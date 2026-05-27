@@ -69,16 +69,15 @@ admin:
 
 ```yaml
 tracing:
-  provider:
+  http:
     name: envoy.tracers.zipkin
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.trace_engines.zipkin.v3.ZipkinConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: zipkin_collector
       collector_endpoint: "/api/v2/spans"
       collector_endpoint_version: JSON
       shared_span_context: false
       trace_id_128bit: true
-      random_sampling: 1.0  # Always sample for debugging; reduce in prod
 ```
 
 ### Zipkin Collector Cluster
@@ -125,10 +124,10 @@ route_config:
 
 ```yaml
 tracing:
-  provider:
+  http:
     name: envoy.tracers.opentelemetry
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.trace_engines.open_telemetry.v3.OpenTelemetryConfig
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
       grpc_service:
         envoy_grpc:
           cluster_name: otel_collector

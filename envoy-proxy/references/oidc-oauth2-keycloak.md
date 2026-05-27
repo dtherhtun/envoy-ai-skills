@@ -100,16 +100,25 @@ http_filters:
 
 ### SDS Secrets for OAuth2
 
+OAuth2 filter needs two secrets via SDS:
+1. **token_secret** — `GenericSecret` containing the OAuth2 client secret
+2. **hmac_secret** — `GenericSecret` for HMAC-encoding OAuth2 cookies
+
+Both are served from a single SDS watch file:
+
 ```yaml
-# /etc/envoy/secrets/oauth-token.yaml
-static_resources:
-  secrets:
-  - name: oauth_token
-    tls:
-      certificate_chain:
-        filename: "/etc/envoy/secrets/oauth-token.secret"  # Base64-encoded client secret
-      private_key:
-        filename: "/etc/envoy/secrets/oauth-token.key"
+# /etc/envoy/secrets/oauth-secrets.yaml
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_token
+  generic_secret:
+    secret:
+      filename: "/etc/envoy/secrets/oauth-client-secret.txt"  # OAuth2 client secret
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_hmac
+  generic_secret:
+    secret:
+      filename: "/etc/envoy/secrets/oauth-hmac-secret.txt"    # HMAC key, 16+ bytes
 ```
 
 ### Route Config for OAuth2
@@ -158,18 +167,17 @@ OAuth2 filter needs two secrets via SDS:
 
 ```yaml
 # /etc/envoy/secrets/generic-secret.yaml
-static_resources:
-  secrets:
-  # Client secret
-  - name: oauth_token
-    tls:
-      certificate_chain:
-        filename: "/etc/envoy/secrets/oauth-client-secret.txt"  # Base64-encoded
-  # HMAC secret (arbitrary string, 16+ bytes recommended)
-  - name: oauth_hmac
-    tls:
-      certificate_chain:
-        filename: "/etc/envoy/secrets/oauth-hmac-secret.txt"    # Base64-encoded
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_token
+  generic_secret:
+    secret:
+      filename: "/etc/envoy/secrets/oauth-client-secret.txt"  # OAuth2 client secret
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_hmac
+  generic_secret:
+    secret:
+      filename: "/etc/envoy/secrets/oauth-hmac-secret.txt"    # Arbitrary string, 16+ bytes recommended
 ```
 
 ### Public Routes (pass_through_matcher)

@@ -55,7 +55,9 @@ static_resources:
               default_validation_context:
                 typed_extension_protocol_options:
                   envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext: {}
-              match_client_cert_spiffe: true  # v1.33+
+              match_typed_subject_alt_names:
+              - type: OIDCI
+                value: "spiffe://example.com/ns/default/sa/backend"
           require_client_certificate: true  # Strict mTLS — reject non-TLS clients
       filters:
       - name: envoy.filters.network.http_connection_manager
@@ -109,19 +111,18 @@ clusters:
               path: "/etc/envoy/certs/ca-cert.yaml"
           match_typed_subject_alt_names:
           - spiffe_id: "secure-backend.example.svc.cluster.local"
-          matchSAN:
-            match_option: spiiffe_id  # Verify server SPIFFE ID
 ```
 
-## SDS Secret Configuration Files
+## SDS Secret Watch Files
 
 ### Server Certificate Secret
 
 ```yaml
 # /etc/envoy/certs/server-cert.yaml
-static_resources:
-  secrets:
-  - name: server_cert
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
     certificate_chain:
       filename: /etc/envoy/certs/server.crt
     private_key:
@@ -132,9 +133,10 @@ static_resources:
 
 ```yaml
 # /etc/envoy/certs/client-cert.yaml
-static_resources:
-  secrets:
-  - name: client_cert
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: client_cert
+  tls_certificate:
     certificate_chain:
       filename: /etc/envoy/certs/client.crt
     private_key:
@@ -145,37 +147,40 @@ static_resources:
 
 ```yaml
 # /etc/envoy/certs/ca-cert.yaml
-static_resources:
-  secrets:
-  - name: ca_cert
-    certificate_chain:
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: ca_cert
+  validation_context:
+    trusted_ca:
       filename: /etc/envoy/certs/ca.crt
 ```
 
-### GenericSecret for OAuth2 (see oidc-oauth2-keycloak.md)
+### SDS GenericSecret for OAuth2 (see oidc-oauth2-keycloak.md)
 
 ```yaml
 # /etc/envoy/secrets/oauth-token.yaml
-static_resources:
-  secrets:
-  - name: oauth_token
-    tls:
-      certificate_chain:
-        filename: /etc/envoy/secrets/oauth-token.secret
-  - name: oauth_hmac
-    tls:
-      certificate_chain:
-        filename: /etc/envoy/secrets/oauth-hmac-secret.txt
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_token
+  generic_secret:
+    secret:
+      filename: /etc/envoy/secrets/oauth-token.secret
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: oauth_hmac
+  generic_secret:
+    secret:
+      filename: /etc/envoy/secrets/oauth-hmac-secret.txt
 ```
 
 ## SDS Secret Rotation Workflow
 
 ```bash
-# 1. Update the secret file (example: server cert rotation)
+# 1. Update the secret watch file (example: server cert rotation)
 cat > /etc/envoy/certs/server-cert.yaml << 'EOF'
-static_resources:
-  secrets:
-  - name: server_cert
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
     certificate_chain:
       filename: /etc/envoy/certs/server.crt
     private_key:
@@ -186,7 +191,7 @@ EOF
 kill -USR1 $(cat /var/run/envoy.pid)
 
 # 3. Verify secrets were loaded
-curl http://127.0.0.1:9901/config_dump?mask=secrets | jq '.configs[].static_secrets[]?.name'
+curl http://127.0.0.1:9901/config_dump?mask=secrets | jq '.configs[].dynamic_secrets[]?.name'
 
 # 4. Verify listener status
 curl http://127.0.0.1:9901/listeners?format=json | jq '.configs[].listener[].filter_chains[].transport_socket.typed_config.common_tls_context.tls_certificates[].certificate_chain.typed_config.secret_name'
@@ -212,11 +217,12 @@ rotate_secrets() {
     -days 365 \
     -subj "/CN=proxy.example.com/O=Example/C=US"
 
-  # Update SDS secret file
-  cat > "${CERT_DIR}/server-cert.yaml" << EOF
-static_resources:
-  secrets:
-  - name: server_cert
+  # Update SDS secret watch file
+  cat > "${CERT_DIR}/server-cert.yaml" << 'EOF'
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
     certificate_chain:
       filename: ${CERT_DIR}/server.crt
     private_key:
@@ -241,15 +247,12 @@ done
 ```yaml
 combined_validation_context:
   match_typed_subject_alt_names:
-  - spiffe_id: "cluster.default.svc.cluster.local"
+  - match_option:
+      spiffe_id: "cluster.default.svc.cluster.local"
   validation_context:
     trusted_ca:
       sds_config:
         path: "/etc/envoy/certs/ca-cert.yaml"
-  default_validation_context:
-    typed_extension_protocol_options:
-      envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext: {}
-  match_client_cert_spiffe: true  # Reject if client SPIFFE doesn't match
 ```
 
 ### Matching SPIFFE IDs on Servers (Upstream)
@@ -273,7 +276,7 @@ common_tls_context:
 | `cipher_suites` | ECDHE+AES-GCM only | No CBC, no SHA1 MAC, no RC4, no MD5 |
 | `alpn_protocols` | `h2` + `http/1.1` | HTTP/2 with fallback |
 | `require_client_certificate` | `true` (mTLS) | False for TLS-only termination |
-| `match_client_cert_spiffe` | `true` | v1.33+ SPIFFE matching |
+| `match_typed_subject_alt_names` | Use `spiffe_id` enum | SPIFFE identity matching via MatchTypedSubjectAltNames |
 | `verify_subject_alt_name` | SAN matching | Alternative to SPIFFE matching |
 
 ## Common Pitfalls
@@ -291,5 +294,4 @@ common_tls_context:
 | No health check on upstream TLS cluster | Stale TLS errors go undetected | Add `http_health_check` or `tcp_health_check` |
 | Certificate expiration | Service goes down silently | Monitor cert expiry via admin `/certs` endpoint |
 | Missing `alpn_protocols` | HTTP/2 negotiation fails | Add `h2` to `alpn_protocols` for HTTP/2 support |
-| `match_client_cert_spiffe` without `match_typed_subject_alt_names` | No server identity verification | Always pair SPIFFE matching with `match_typed_subject_alt_names` |
 | SDS path not symlink-friendly | Hot reload breaks with cert tools | Use consistent path structure; avoid symlinks in SDS paths |
