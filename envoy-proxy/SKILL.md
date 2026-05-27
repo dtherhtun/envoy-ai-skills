@@ -19,14 +19,14 @@ Production-grade Envoy proxy configuration reference for v1.38.0 using the v3 AP
 
 ## Directory Map
 
-| File | Use when… |
-|------|-----------|
-| `filters.md` | Building filter chains, looking up `@type` URLs, understanding filter behavior |
-| `clusters.md` | Defining upstream clusters, LB policies, health checks, circuit breakers, outlier detection |
-| `wasm.md` | Configuring WASM plugins (v8/wamr/wasmtime), remote sources, OIDC via WASM |
-| `oidc-oauth2-keycloak.md` | OAuth2, JWT authn, ExtAuthz patterns; Keycloak integration; filter ordering |
-| `observability.md` | Prometheus stats, Zipkin/OTel tracing, access logs, admin API debugging |
-| `tls.md` | TLS termination, mTLS, downstream/upstream TLS contexts, SDS cert rotation |
+| File                                                          | Use when… |
+|---------------------------------------------------------------|-----------|
+| [filters.md](references/filters.md)                           | Building filter chains, looking up `@type` URLs, understanding filter behavior |
+| [clusters.md](references/clusters.md)                         | Defining upstream clusters, LB policies, health checks, circuit breakers, outlier detection |
+| [wasm.md](references/wasm.md)                                 | Configuring WASM plugins (v8/wamr/wasmtime), remote sources, OIDC via WASM |
+| [oidc-oauth2-keycloak.md](references/oidc-oauth2-keycloak.md) | OAuth2, JWT authn, ExtAuthz patterns; Keycloak integration; filter ordering |
+| [observability.md](references/observability.md)               | Prometheus stats, Zipkin/OTel tracing, access logs, admin API debugging |
+| [tls.md](references/tls.md)                                   | TLS termination, mTLS, downstream/upstream TLS contexts, SDS cert rotation |
 
 ## Core Principles
 
